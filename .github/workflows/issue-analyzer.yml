@@ -78,7 +78,8 @@ jobs:
 
             ### Step 4 — Post a diagnostic comment
 
-            Post via `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "..."` using this structure:
+            Post via `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "..."` using this structure.
+            The comment body MUST be written in GitHub-flavored Markdown (GFM) so it renders correctly on GitHub: use `##` for headings, `**bold**`, backticks for inline code, fenced code blocks with ` ``` `, and `-` for bullet lists.
 
             ## Issue Analysis
 
