@@ -1,0 +1,110 @@
+name: Issue Analyzer
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: issue-analyze-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Analyze issue with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools 'Bash(gh issue edit *),Bash(gh label create *),Bash(gh issue comment *)'"
+          prompt: |
+            You are an automated issue analyst for a browser-based Tetris game repository.
+
+            ## Issue Details
+            - Number: ${{ github.event.issue.number }}
+            - Title: ${{ github.event.issue.title }}
+            - Body:
+            ${{ github.event.issue.body }}
+
+            ## Your Task
+
+            Analyze this issue and perform the following steps using `gh` CLI commands.
+
+            ### Step 1 — Classify the issue
+
+            Choose exactly ONE type label and ONE or MORE area labels.
+
+            **Type labels** (pick one):
+            - `bug` — something is broken or behaves incorrectly
+            - `enhancement` — a new feature or improvement
+            - `question` — asking for clarification or help
+            - `documentation` — relates to docs, README, or CLAUDE.md
+
+            **Area labels** (pick all that apply):
+            - `gameplay` — piece spawning, locking, collision, rotation logic
+            - `ui` — canvas layout, overlay, HUD elements, next-piece preview
+            - `performance` — frame rate, requestAnimationFrame loop, rendering efficiency
+            - `controls` — keyboard event handling (ArrowLeft/Right/Up/Down, Space, P)
+            - `scoring` — score calculation, line count, level progression, dropInterval
+            - `rendering` — drawBlock, drawGrid, draw, drawNext, ghost piece visuals
+
+            ### Step 2 — Create labels if they do not exist
+
+            For each chosen label run:
+            ```
+            gh label create "<name>" --color "<hex>" --description "<short desc>" --repo ${{ github.repository }} --force
+            ```
+
+            Colors to use:
+            - bug: #d73a4a | enhancement: #a2eeef | question: #d876e3 | documentation: #0075ca
+            - gameplay: #e4e669 | ui: #bfd4f2 | performance: #f9d0c4 | controls: #c5def5
+            - scoring: #fef2c0 | rendering: #d4c5f9
+
+            ### Step 3 — Apply labels
+
+            ```
+            gh issue edit ${{ github.event.issue.number }} --add-label "<label1>,<label2>,..." --repo ${{ github.repository }}
+            ```
+
+            ### Step 4 — Post a diagnostic comment
+
+            Post via `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "..."` using this structure:
+
+            ## Issue Analysis
+
+            **Classification:** <type> / <area(s)>
+
+            ### Affected Code Areas
+            Reference the relevant functions from game.js:
+            - `collide(shape, ox, oy)` — boundary + overlap check
+            - `rotateCW(shape)` / `tryRotate()` — rotation with wall kicks
+            - `clearLines()` — removes full rows, updates score/level/dropInterval
+            - `ghostY()` — projects piece to landing row
+            - `hardDrop()` / `softDrop()` — drop controls
+            - `lockPiece()` — merge → clearLines → spawn sequence
+            - `spawn()` — advances next→current, checks game-over collision
+            - `draw()` / `drawBlock()` / `drawGrid()` / `drawNext()` — rendering pipeline
+            - `loop(ts)` — requestAnimationFrame game loop
+            - `init()` — full game reset
+            - `keydown` handler — keyboard controls
+
+            ### Root Cause Analysis
+            <1–3 sentences on the likely cause>
+
+            ### Recommended Implementation Approach
+            <Concrete steps naming specific functions and variables to change>
+
+            ---
+            *Automated analysis by Claude — event: `${{ github.event.action }}`*
+
+            Execute all four steps now without asking for confirmation.
